@@ -1,84 +1,98 @@
 import numpy as np
+from itertools import combinations
 
 def dissimilarity(Q: np.ndarray, y: np.ndarray) -> float:
     """
-    Compute a multi-class dissimilarity measure from a similarity matrix Q and labels y.
-    
-    Parameters
-    ----------
-    Q : np.ndarray, shape (N, C)
-        Similarity matrix: Q[i, j] is the similarity of sample i to class j.
-    y : np.ndarray, shape (N,)
-        Integer labels in {0, 1, ..., C-1}. Each class index must appear at least once.
-    
-    Returns
-    -------
-    S : float
-        Aggregated dissimilarity: sum over all 0 <= k < l < C of
-          ||V_k - V_l|| * (V_k · V_l) / (||V_k|| * ||V_l||),
-        where V_k = mean of Q[i,:] over i with y[i] == k.
+    Calculates a dissimilarity metric based on a generalization of the method
+    proposed in "Width optimization of RBF kernels for binary classiﬁcation of support
+    vector machines: A density estimation-based approach" by Menezes et al. (2019).
+
+    The function measures the separability between classes in a given similarity space.
+    A lower value indicates a pair of classes that are less separable (more similar),
+    representing the "weakest link" in the multi-class separation.
+
+    Args:
+        Q (np.ndarray): A 2D numpy array of shape (n_samples, n_classes). Q[i, j]
+                        represents the similarity of sample `i` to class `j`.
+        y (np.ndarray): A 1D numpy array of shape (n_samples,) containing the true
+                        class labels for each sample. Labels are expected to be
+                        integers from 0 to n_classes-1.
+
+    Returns:
+        float: The minimum pairwise dissimilarity score among all unique pairs of
+               classes. Returns 0.0 if there are fewer than 2 classes. A higher
+               score implies better separability.
     """
-    # Ensure inputs have compatible shapes
+    # Ensure inputs are numpy arrays for optimized operations
+    try:
+        Q = np.asanyarray(Q, dtype=np.float64)
+        y = np.asanyarray(y, dtype=int)
+    except (ValueError, TypeError):
+        raise TypeError("Inputs Q and y must be convertible to numpy arrays.")
+
     if Q.ndim != 2:
-        raise ValueError("Q must be a 2D array of shape (N, C).")
-    N, C = Q.shape
-    if y.ndim != 1 or y.shape[0] != N:
-        raise ValueError("y must be a 1D array of length N = Q.shape[0].")
-    
-    # Convert y to integer array
-    y = np.asarray(y, dtype=np.int64)
-    # Check label range
-    if np.any(y < 0) or np.any(y >= C):
-        raise ValueError("Labels y must be integers in [0, C-1], matching Q's columns.")
-    
-    # Count samples per class
-    counts = np.bincount(y, minlength=C)
-    if np.any(counts == 0):
-        # Some class has no samples
-        missing = np.where(counts == 0)[0]
-        raise ValueError(f"Each class 0..{C-1} must appear at least once; missing: {missing.tolist()}")
-    
-    # Compute sum of Q rows per class, shape (C, C)
-    # sum_Q[k] = sum of Q[i] over i with y[i] == k
-    sum_Q = np.zeros((C, C), dtype=Q.dtype)
-    # Using np.add.at for efficiency in C loops
-    np.add.at(sum_Q, y, Q)
-    # Compute class-mean vectors V: shape (C, C)
-    # V[k] = (1 / counts[k]) * sum_Q[k]
-    # Broadcasting counts[:,None]
-    V = sum_Q / counts[:, None]
-    
-    # Compute Gram matrix of V: G[k, l] = V[k]·V[l]
-    G = V @ V.T  # shape (C, C)
-    
-    # Compute squared norms of each V[k]
-    norm_sq = np.diag(G)  # shape (C,)
-    # Compute norms, guard against zero
-    # Since counts>0 and similarities nonnegative, norms should be >0; but guard anyway:
-    norms = np.sqrt(norm_sq)
-    
-    # Prepare outer product of norms for cosine
-    # To avoid division by zero, we will mask later; create outer:
-    norm_outer = norms[:, None] * norms[None, :]
-    
-    # Compute pairwise cosines, safe: set cos=0 where norm_outer == 0
-    with np.errstate(divide='ignore', invalid='ignore'):
-        cosines = np.divide(G, norm_outer, out=np.zeros_like(G), where=(norm_outer > 0))
-    
-    # Compute pairwise squared distances: ||V_k - V_l||^2 = norm_sq[k] + norm_sq[l] - 2*G[k,l]
-    # Use broadcasting:
-    D2 = norm_sq[:, None] + norm_sq[None, :] - 2 * G
-    # Numerical errors might make tiny negatives; clip to >=0
-    D2 = np.maximum(D2, 0.0)
-    D = np.sqrt(D2)
-    
-    # Compute matrix of d_{k,l} = D[k,l] * cosines[k,l]
-    # We only need sum over k<l
-    M = D * cosines
-    
-    # Sum over upper triangle k<l
-    # Using np.triu_indices
-    iu = np.triu_indices(C, k=1)
-    S = np.sum(M[iu])
-    
-    return float(S)
+        raise ValueError("Input Q must be a 2D array.")
+    if y.ndim != 1:
+        raise ValueError("Input y must be a 1D array.")
+    if Q.shape[0] != y.shape[0]:
+        raise ValueError("The number of samples in Q and y must be the same.")
+
+    # Find unique classes present in the data
+    unique_labels = np.unique(y)
+    n_classes = len(unique_labels)
+
+    # If there's only one class or no classes, dissimilarity is not applicable.
+    if n_classes < 2:
+        return 0.0
+
+    # The number of columns in Q should match the number of classes.
+    if Q.shape[1] != n_classes:
+         raise ValueError(f"The number of columns in Q ({Q.shape[1]}) must match the number of unique classes in y ({n_classes}).")
+
+
+    # --- Step 1: Compute the Class Similarity Matrix S ---
+    # S[i, j] will be the average similarity of samples from class `i` to class `j`.
+    # This is a vectorized implementation that avoids explicit Python loops over samples.
+    S = np.zeros((n_classes, n_classes), dtype=np.float64)
+    for i, label in enumerate(unique_labels):
+        # Create a boolean mask to select samples belonging to the current class
+        mask = (y == label)
+        # For class i, calculate its average similarity to all other classes j.
+        # This computes a single row of the S matrix.
+        S[i, :] = np.mean(Q[mask], axis=0)
+
+    # Each row of S is now a vector Vi, representing the similarity profile of class i.
+    V_vectors = S
+
+    # --- Step 2: Calculate pairwise dissimilarity for all unique class pairs ---
+    min_dissimilarity = np.inf
+
+    # Use itertools.combinations to efficiently get all unique pairs of class indices.
+    for i, j in combinations(range(n_classes), 2):
+        Vi = V_vectors[i]
+        Vj = V_vectors[j]
+
+        # Calculate the components of the dissimilarity function from the paper.
+        # D(Vi, Vj) = ||Vi - Vj|| * cos(Vi, Vj)
+        euclidean_dist = np.linalg.norm(Vi - Vj)
+        norm_vi = np.linalg.norm(Vi)
+        norm_vj = np.linalg.norm(Vj)
+
+        # Handle the edge case where a class similarity vector has zero magnitude.
+        # This can happen if a class has no similarity to any other class,
+        # which is unlikely but possible. In this case, cosine is undefined.
+        if norm_vi == 0 or norm_vj == 0:
+            pairwise_dissim = 0.0
+        else:
+            dot_product = np.dot(Vi, Vj)
+            # The cosine of the angle between the two class-similarity vectors
+            cosine_similarity = dot_product / (norm_vi * norm_vj)
+            pairwise_dissim = euclidean_dist * cosine_similarity
+
+        # Update the minimum dissimilarity found so far.
+        if pairwise_dissim < min_dissimilarity:
+            min_dissimilarity = pairwise_dissim
+
+    # If no pairs were evaluated (which shouldn't happen with n_classes >= 2), return 0.
+    return min_dissimilarity if min_dissimilarity != np.inf else 0.0
+
