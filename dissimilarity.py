@@ -1,7 +1,7 @@
 import numpy as np
 from itertools import combinations
 
-def dissimilarity(Q: np.ndarray, y: np.ndarray) -> float:
+def dissimilarity(Q: np.ndarray, y: np.ndarray, h: float, k: int) -> float:
     """
     Calculates a dissimilarity metric based on a generalization of the method
     proposed in "Width optimization of RBF kernels for binary classiﬁcation of support
@@ -11,12 +11,21 @@ def dissimilarity(Q: np.ndarray, y: np.ndarray) -> float:
     A lower value indicates a pair of classes that are less separable (more similar),
     representing the "weakest link" in the multi-class separation.
 
-    Args:
+    Parameters:
         Q (np.ndarray): A 2D numpy array of shape (n_samples, n_classes). Q[i, j]
                         represents the similarity of sample `i` to class `j`.
         y (np.ndarray): A 1D numpy array of shape (n_samples,) containing the true
                         class labels for each sample. Labels are expected to be
                         integers from 0 to n_classes-1.
+        h (float): The bandwidth parameter for the RBF kernel. Used as regularization
+                   to control the smoothness of the similarity space.
+        k (int): The number of nearest neighbors to consider in the sparse RBF kernel.
+                 Used as regularization to control the sparsity of the similarity space.
+
+    Raises:
+        TypeError: If Q or y cannot be converted to numpy arrays.
+        ValueError: If Q is not a 2D array, y is not a 1D array, or if the number of samples in Q and y do not match.
+        ValueError: If the number of columns in Q does not match the number of unique classes in y.
 
     Returns:
         float: The minimum pairwise dissimilarity score among all unique pairs of
