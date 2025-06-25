@@ -1,7 +1,7 @@
 import numpy as np
 from itertools import combinations
 
-def dissimilarity(Q: np.ndarray, y: np.ndarray, h: float, k: int) -> float:
+def dissimilarity(Q: np.ndarray, y: np.ndarray, factor_h: float, factor_k: int) -> float:
     """
     Calculates a dissimilarity metric based on a generalization of the method
     proposed in "Width optimization of RBF kernels for binary classiﬁcation of support
@@ -17,10 +17,10 @@ def dissimilarity(Q: np.ndarray, y: np.ndarray, h: float, k: int) -> float:
         y (np.ndarray): A 1D numpy array of shape (n_samples,) containing the true
                         class labels for each sample. Labels are expected to be
                         integers from 0 to n_classes-1.
-        h (float): The bandwidth parameter for the RBF kernel. Used as regularization
-                   to control the smoothness of the similarity space.
-        k (int): The number of nearest neighbors to consider in the sparse RBF kernel.
-                 Used as regularization to control the sparsity of the similarity space.
+        factor_h (float): A scaled factor from the RBF kernel bandwidth parameter.
+                          This is used to adjust the dissimilarity score.
+        factor_k (int): A scaled factor from the number of nearest neighbors used in
+                        the sparse RBF kernel. This is used to adjust the dissimilarity score.
 
     Raises:
         TypeError: If Q or y cannot be converted to numpy arrays.
@@ -103,5 +103,6 @@ def dissimilarity(Q: np.ndarray, y: np.ndarray, h: float, k: int) -> float:
             min_dissimilarity = pairwise_dissim
 
     # If no pairs were evaluated (which shouldn't happen with n_classes >= 2), return 0.
-    return min_dissimilarity if min_dissimilarity != np.inf else 0.0
+    return min_dissimilarity / (factor_h * factor_k) \
+            if min_dissimilarity != np.inf else 0.0
 
