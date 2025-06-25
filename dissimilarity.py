@@ -103,6 +103,6 @@ def dissimilarity(Q: np.ndarray, y: np.ndarray, factor_h: float, factor_k: int) 
             min_dissimilarity = pairwise_dissim
 
     # If no pairs were evaluated (which shouldn't happen with n_classes >= 2), return 0.
-    return min_dissimilarity / (factor_h * factor_k) \
+    return min_dissimilarity * (1 - factor_h) * (1 - factor_k) \
             if min_dissimilarity != np.inf else 0.0
 
