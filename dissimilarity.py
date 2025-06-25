@@ -16,17 +16,18 @@ def dissimilarity(Q: np.ndarray, y: np.ndarray, factor_h: float, factor_k: int) 
                         class labels for each sample. Labels are expected to be
                         integers from 0 to n_classes-1.
         factor_h (float): A scaled factor from the RBF kernel bandwidth parameter.
-                          This is used to adjust the dissimilarity score.
         factor_k (int): A scaled factor from the number of nearest neighbors used in
-                        the sparse RBF kernel. This is used to adjust the dissimilarity score.
+                        the sparse RBF kernel.
 
     Raises:
         TypeError: If Q or y cannot be converted to numpy arrays.
-        ValueError: If Q is not a 2D array, y is not a 1D array, or if the number of samples in Q and y do not match.
-        ValueError: If the number of columns in Q does not match the number of unique classes in y.
+        ValueError: If Q is not a 2D array, y is not a 1D array, or if the number of
+                    samples in Q and y do not match.
+        ValueError: If the number of columns in Q does not match the number of
+                    unique classes in y.
 
     Returns:
-        float: The generalized dissimilarity score between classes.
+        float: The dissimilarity score.
     """
     # Ensure inputs are numpy arrays for optimized operations
     try:
@@ -52,25 +53,23 @@ def dissimilarity(Q: np.ndarray, y: np.ndarray, factor_h: float, factor_k: int) 
 
     # The number of columns in Q should match the number of classes.
     if Q.shape[1] != n_classes:
-         raise ValueError(f"The number of columns in Q ({Q.shape[1]}) must match the number of unique classes in y ({n_classes}).")
-
+         raise ValueError(
+             f"The number of columns in Q ({Q.shape[1]}) must match the "
+             f"number of unique classes in y ({n_classes})."
+         )
 
     # --- Step 1: Compute the Class Similarity Matrix S ---
     # S[i, j] will be the average similarity of samples from class `i` to class `j`.
-    # This is a vectorized implementation that avoids explicit Python loops over samples.
     S = np.zeros((n_classes, n_classes), dtype=np.float64)
     for i, label in enumerate(unique_labels):
-        # Create a boolean mask to select samples belonging to the current class
         mask = (y == label)
-        # For class i, calculate its average similarity to all other classes j.
-        # This computes a single row of the S matrix.
         S[i, :] = np.mean(Q[mask], axis=0)
 
     # Each row of S is now a vector Vi, representing the similarity profile of class i.
     V_vectors = S
 
     # --- Step 2: Calculate pairwise dissimilarity for all unique class pairs ---
-    min_dissimilarity = np.inf
+    all_dissimilarities = []
 
     # Use itertools.combinations to efficiently get all unique pairs of class indices.
     for i, j in combinations(range(n_classes), 2):
@@ -78,14 +77,11 @@ def dissimilarity(Q: np.ndarray, y: np.ndarray, factor_h: float, factor_k: int) 
         Vj = V_vectors[j]
 
         # Calculate the components of the dissimilarity function from the paper.
-        # D(Vi, Vj) = ||Vi - Vj|| * cos(Vi, Vj)
         euclidean_dist = np.linalg.norm(Vi - Vj)
         norm_vi = np.linalg.norm(Vi)
         norm_vj = np.linalg.norm(Vj)
-
+        
         # Handle the edge case where a class similarity vector has zero magnitude.
-        # This can happen if a class has no similarity to any other class,
-        # which is unlikely but possible. In this case, cosine is undefined.
         if norm_vi == 0 or norm_vj == 0:
             pairwise_dissim = 0.0
         else:
@@ -94,9 +90,16 @@ def dissimilarity(Q: np.ndarray, y: np.ndarray, factor_h: float, factor_k: int) 
             cosine_similarity = dot_product / (norm_vi * norm_vj)
             pairwise_dissim = euclidean_dist * cosine_similarity
 
-        # Update the minimum dissimilarity found so far.
-        if pairwise_dissim < min_dissimilarity:
-            min_dissimilarity = pairwise_dissim
+        # Add the calculated dissimilarity to our list
+        all_dissimilarities.append(pairwise_dissim)
 
-    return min_dissimilarity
+    # --- Step 3: Calculate the final score ---
+    # Convert the list to a NumPy array for efficient vectorized calculations.
+    dissim_array = np.array(all_dissimilarities)
+    
+    # Calculate the mean and standard deviation of all pairwise dissimilarities.
+    mean_dissim = np.mean(dissim_array)
+    std_dissim = np.std(dissim_array)
 
+    # Return the mean minus the standard deviation.
+    return float(mean_dissim - std_dissim)
