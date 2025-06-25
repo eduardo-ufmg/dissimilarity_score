@@ -8,8 +8,6 @@ def dissimilarity(Q: np.ndarray, y: np.ndarray, factor_h: float, factor_k: int) 
     vector machines: A density estimation-based approach" by Menezes et al. (2019).
 
     The function measures the separability between classes in a given similarity space.
-    A lower value indicates a pair of classes that are less separable (more similar),
-    representing the "weakest link" in the multi-class separation.
 
     Parameters:
         Q (np.ndarray): A 2D numpy array of shape (n_samples, n_classes). Q[i, j]
@@ -28,9 +26,7 @@ def dissimilarity(Q: np.ndarray, y: np.ndarray, factor_h: float, factor_k: int) 
         ValueError: If the number of columns in Q does not match the number of unique classes in y.
 
     Returns:
-        float: The minimum pairwise dissimilarity score among all unique pairs of
-               classes. Returns 0.0 if there are fewer than 2 classes. A higher
-               score implies better separability.
+        float: The generalized dissimilarity score between classes.
     """
     # Ensure inputs are numpy arrays for optimized operations
     try:
@@ -102,7 +98,5 @@ def dissimilarity(Q: np.ndarray, y: np.ndarray, factor_h: float, factor_k: int) 
         if pairwise_dissim < min_dissimilarity:
             min_dissimilarity = pairwise_dissim
 
-    # If no pairs were evaluated (which shouldn't happen with n_classes >= 2), return 0.
-    return min_dissimilarity * (1 - factor_h) * (1 - factor_k) \
-            if min_dissimilarity != np.inf else 0.0
+    return min_dissimilarity
 
