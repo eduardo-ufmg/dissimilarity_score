@@ -19,15 +19,15 @@ def dissimilarity(Q: np.ndarray, y: np.ndarray, factor_h: float, factor_k: int) 
         factor_k (int): A scaled factor from the number of nearest neighbors used in
                         the sparse RBF kernel.
 
+    Returns:
+        float: The dissimilarity score.
+
     Raises:
         TypeError: If Q or y cannot be converted to numpy arrays.
         ValueError: If Q is not a 2D array, y is not a 1D array, or if the number of
                     samples in Q and y do not match.
         ValueError: If the number of columns in Q does not match the number of
                     unique classes in y.
-
-    Returns:
-        float: The dissimilarity score.
     """
     # Ensure inputs are numpy arrays for optimized operations
     try:
