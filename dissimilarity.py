@@ -102,4 +102,4 @@ def dissimilarity(Q: np.ndarray, y: np.ndarray, factor_h: float, factor_k: int) 
     std_dissim = np.std(dissim_array)
 
     # Return the mean minus the standard deviation.
-    return float(mean_dissim - std_dissim) * factor_h * factor_k
+    return float(mean_dissim / std_dissim) * factor_h * factor_k if std_dissim != 0 else 0.0
