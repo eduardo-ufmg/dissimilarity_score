@@ -1,7 +1,11 @@
-import numpy as np
 from itertools import combinations
 
-def dissimilarity(Q: np.ndarray, y: np.ndarray, factor_h: float, factor_k: int) -> float:
+import numpy as np
+
+
+def dissimilarity(
+    Q: np.ndarray, y: np.ndarray, factor_h: float, factor_k: int
+) -> float:
     """
     Calculates a dissimilarity metric based on a generalization of the method
     proposed in "Width optimization of RBF kernels for binary classiﬁcation of support
@@ -53,16 +57,16 @@ def dissimilarity(Q: np.ndarray, y: np.ndarray, factor_h: float, factor_k: int) 
 
     # The number of columns in Q should match the number of classes.
     if Q.shape[1] != n_classes:
-         raise ValueError(
-             f"The number of columns in Q ({Q.shape[1]}) must match the "
-             f"number of unique classes in y ({n_classes})."
-         )
+        raise ValueError(
+            f"The number of columns in Q ({Q.shape[1]}) must match the "
+            f"number of unique classes in y ({n_classes})."
+        )
 
     # --- Step 1: Compute the Class Similarity Matrix S ---
     # S[i, j] will be the average similarity of samples from class `i` to class `j`.
     S = np.zeros((n_classes, n_classes), dtype=np.float64)
     for i, label in enumerate(unique_labels):
-        mask = (y == label)
+        mask = y == label
         S[i, :] = np.mean(Q[mask], axis=0)
 
     # Each row of S is now a vector Vi, representing the similarity profile of class i.
@@ -80,7 +84,7 @@ def dissimilarity(Q: np.ndarray, y: np.ndarray, factor_h: float, factor_k: int) 
         euclidean_dist = np.linalg.norm(Vi - Vj)
         norm_vi = np.linalg.norm(Vi)
         norm_vj = np.linalg.norm(Vj)
-        
+
         # Handle the edge case where a class similarity vector has zero magnitude.
         if norm_vi == 0 or norm_vj == 0:
             pairwise_dissim = 0.0
@@ -96,7 +100,7 @@ def dissimilarity(Q: np.ndarray, y: np.ndarray, factor_h: float, factor_k: int) 
     # --- Step 3: Calculate the final score ---
     # Convert the list to a NumPy array for efficient vectorized calculations.
     dissim_array = np.array(all_dissimilarities)
-    
+
     # Calculate the mean and standard deviation of all pairwise dissimilarities.
     mean_dissim = np.mean(dissim_array)
     std_dissim = np.std(dissim_array)
