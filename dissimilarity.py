@@ -6,7 +6,11 @@ import numpy as np
 
 
 def dissimilarity(
-    Q: np.ndarray, y: np.ndarray, factor_h: float, factor_k: float, classes: np.ndarray | None = None
+    Q: np.ndarray,
+    y: np.ndarray,
+    factor_h: float,
+    factor_k: float,
+    classes: np.ndarray | None = None,
 ) -> float:
     """
     Calculates a dissimilarity metric based on a generalization of the method
