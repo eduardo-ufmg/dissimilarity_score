@@ -1,10 +1,12 @@
 from itertools import combinations
 
+from paramhandling.paramhandler import parcheck, get_nparrays, get_classes
+
 import numpy as np
 
 
 def dissimilarity(
-    Q: np.ndarray, y: np.ndarray, factor_h: float, factor_k: int
+    Q: np.ndarray, y: np.ndarray, factor_h: float, factor_k: float, classes: np.ndarray | None = None
 ) -> float:
     """
     Calculates a dissimilarity metric based on a generalization of the method
@@ -14,14 +16,18 @@ def dissimilarity(
     The function measures the separability between classes in a given similarity space.
 
     Parameters:
-        Q (np.ndarray): A 2D numpy array of shape (n_samples, n_classes). Q[i, j]
-                        represents the similarity of sample `i` to class `j`.
-        y (np.ndarray): A 1D numpy array of shape (n_samples,) containing the true
-                        class labels for each sample. Labels are expected to be
-                        integers from 0 to n_classes-1.
+        Q (np.ndarray): An (M, N) similarity matrix where M is the number of samples
+                        and N is the number of classes. Q[i, c] is the similarity
+                        of sample i to class c. These rows are treated as points
+                        in an N-dimensional space.
+        y (np.ndarray): An (M,) array of labels, where y[i] is the integer class
+                        label for sample i.
         factor_h (float): A scaled factor from the RBF kernel bandwidth parameter.
-        factor_k (int): A scaled factor from the number of nearest neighbors used in
-                        the sparse RBF kernel.
+        factor_k (float): A scaled factor from the number of nearest neighbors used in
+                          the sparse RBF kernel.
+        classes (np.ndarray | None): The complete list of unique class labels. If provided,
+                                     it's used to define the class space. If None,
+                                     classes are inferred from y.
 
     Returns:
         float: The dissimilarity score.
@@ -33,41 +39,20 @@ def dissimilarity(
         ValueError: If the number of columns in Q does not match the number of
                     unique classes in y.
     """
-    # Ensure inputs are numpy arrays for optimized operations
-    try:
-        Q = np.asanyarray(Q, dtype=np.float64)
-        y = np.asanyarray(y, dtype=int)
-    except (ValueError, TypeError):
-        raise TypeError("Inputs Q and y must be convertible to numpy arrays.")
 
-    if Q.ndim != 2:
-        raise ValueError("Input Q must be a 2D array.")
-    if y.ndim != 1:
-        raise ValueError("Input y must be a 1D array.")
-    if Q.shape[0] != y.shape[0]:
-        raise ValueError("The number of samples in Q and y must be the same.")
-
-    # Find unique classes present in the data
-    unique_labels = np.unique(y)
-    n_classes = len(unique_labels)
-
-    # If there's only one class or no classes, dissimilarity is not applicable.
-    if n_classes < 2:
-        return 0.0
-
-    # The number of columns in Q should match the number of classes.
-    if Q.shape[1] != n_classes:
-        raise ValueError(
-            f"The number of columns in Q ({Q.shape[1]}) must match the "
-            f"number of unique classes in y ({n_classes})."
-        )
+    parcheck(Q, y, factor_h, factor_k, classes)
+    Q, y = get_nparrays(Q, y)
+    unique_labels, n_classes = get_classes(y, classes)
 
     # --- Step 1: Compute the Class Similarity Matrix S ---
     # S[i, j] will be the average similarity of samples from class `i` to class `j`.
     S = np.zeros((n_classes, n_classes), dtype=np.float64)
     for i, label in enumerate(unique_labels):
         mask = y == label
-        S[i, :] = np.mean(Q[mask], axis=0)
+        # Only compute the mean if there are samples for the class.
+        if np.any(mask):
+            S[i, :] = np.mean(Q[mask], axis=0)
+        # Otherwise, S[i, :] remains a vector of zeros.
 
     # Each row of S is now a vector Vi, representing the similarity profile of class i.
     V_vectors = S
