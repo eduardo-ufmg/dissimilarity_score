@@ -1,0 +1,3 @@
+[submodule "paramhandling"]
+	path = paramhandling
+	url = https://github.com/eduardo-ufmg/paramhandling.git
